@@ -21,10 +21,8 @@ the poles.
   `localStorage` persistence, and the album detail panel that slides in on
   tile click.
 
-## Notes on scaling up
-
-This is tuned for a personal-sized collection (tens to low hundreds of
-albums), one `PlaneGeometry` mesh per tile. If you want to support a much
-larger library, swap the per-tile meshes in `globe.js` for a single
-`THREE.InstancedMesh` with a texture atlas — individual draw calls per tile
-will bottleneck well before a thousand albums.
+## Notes
+- I want users to feel like they're personalizing a page and truly express 
+  themselves with the covers of their favorite albums. Kind of like an 
+  old MySpace page where you're designing from scratch with CSS your 
+  own personalized music page. 
