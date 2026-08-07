@@ -136,8 +136,7 @@ export default function App() {
             <p className="eyebrow">Your library, mapped</p>
             <h1>Search for an album to start your globe.</h1>
             <p className="body-text">
-              Every album you add gets placed as a tile on a rotating sphere. Search up top to begin —
-              artwork comes from the iTunes catalog, no account needed.
+              Every album you add gets placed as a tile on a rotating sphere. Begin your journey now. 
             </p>
           </div>
         </div>
