@@ -2,12 +2,13 @@ import * as THREE from 'three';
 
 const RADIUS = 5;
 const TILE_SIZE = 0.62;
-const AUTO_ROTATE_SPEED = 0.035; // radians/sec, spin around Y
+const AUTO_ROTATE_SPEED = 0.035; // radians/sec, spin around Y — always on, never pauses
 const AUTO_TILT_SPEED = 0.09; // radians/sec, phase speed for the tilt oscillation
 const MAX_TILT = 0.55; // radians — how far the globe leans, so top/bottom tiles pass into view
-const IDLE_RESUME_MS = 3500; // how long after a manual drag before auto-rotate resumes
+const FIT_MARGIN = 1.00; // extra breathing room around the sphere when framing it
 
-// create the sphere 
+// Even distribution of N points on a sphere — avoids the pinching at the
+// poles you'd get from a naive latitude/longitude grid.
 function fibonacciSpherePoints(count, radius) {
   const points = [];
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
@@ -30,9 +31,8 @@ export class AlbumGlobe {
   constructor(canvas) {
     this.canvas = canvas;
     this.onTileClick = null;
-    this.autoRotate = true;
+    this.dragging = false;
     this.tiltPhase = 0;
-    this.resumeTimer = null;
     this.tiles = [];
 
     this.scene = new THREE.Scene();
@@ -55,8 +55,14 @@ export class AlbumGlobe {
     this.canvas.addEventListener('pointermove', this._onPointerMove.bind(this));
     this.canvas.addEventListener('click', this._onClick.bind(this));
 
+    // ResizeObserver (rather than window's 'resize' event) is what actually
+    // fires reliably on mobile — address bar show/hide, orientation change,
+    // and font-load reflows don't always trigger 'resize', which is what
+    // causes the camera's aspect ratio to go stale and the globe to render
+    // stretched into an oval.
     this._resize();
-    window.addEventListener('resize', this._resize.bind(this));
+    this._resizeObserver = new ResizeObserver(() => this._resize());
+    this._resizeObserver.observe(this.canvas.parentElement);
 
     this._lastTime = performance.now();
     this._animate = this._animate.bind(this);
@@ -82,41 +88,37 @@ export class AlbumGlobe {
   }
 
   _addDragRotation() {
-    let dragging = false;
     let lastX = 0;
     let lastY = 0;
 
     this.canvas.addEventListener('pointerdown', (e) => {
-      dragging = true;
+      this.dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
-      this.autoRotate = false;
-      clearTimeout(this.resumeTimer);
     });
     window.addEventListener('pointerup', () => {
-      if (!dragging) return;
-      dragging = false;
-      // Resume the auto tour after a bit of idle time, so a stray drag
-      // doesn't permanently stop you from seeing the rest of the globe.
-      clearTimeout(this.resumeTimer);
-      this.resumeTimer = setTimeout(() => {
-        this.tiltPhase = 0;
-        this.autoRotate = true;
-      }, IDLE_RESUME_MS);
+      if (!this.dragging) return;
+      this.dragging = false;
+      // Resync the tilt oscillation's phase to wherever the manual drag
+      // left rotation.x, so it continues smoothly instead of jumping.
+      const ratio = THREE.MathUtils.clamp(this.scene.rotation.x / MAX_TILT, -1, 1);
+      this.tiltPhase = Math.asin(ratio);
     });
     window.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
+      if (!this.dragging) return;
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
+      // Added on top of the continuous auto-spin below, not instead of it —
+      // the globe never stops turning, dragging just nudges it further.
       this.scene.rotation.y += dx * 0.005;
       this.scene.rotation.x += dy * 0.005;
       this.scene.rotation.x = Math.max(-1.2, Math.min(1.2, this.scene.rotation.x));
     });
   }
 
-  // Album covers are loaded and each cover is a tile 
+  // Loads album artwork as textures and places one tile per album on the sphere.
   loadAlbums(albums) {
     this._clearTiles();
 
@@ -150,7 +152,7 @@ export class AlbumGlobe {
         },
         undefined,
         () => {
-        
+          // Leave the fallback dark tile in place if artwork fails to load.
         }
       );
     });
@@ -193,19 +195,41 @@ export class AlbumGlobe {
 
   _resize() {
     const { clientWidth, clientHeight } = this.canvas.parentElement;
+    if (!clientWidth || !clientHeight) return; // parent not laid out yet — skip, ResizeObserver will fire again
+
     this.camera.aspect = clientWidth / clientHeight;
+    // Pull the camera back on narrow/portrait viewports so the full sphere
+    // stays framed instead of getting cropped or looking off-balance —
+    // without this, a fixed camera distance tuned for desktop leaves very
+    // little breathing room on a tall phone screen.
+    this.camera.position.z = this._fitDistance();
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(clientWidth, clientHeight, false);
+  }
+
+  // Distance needed so a sphere of FIT_RADIUS stays fully inside the
+  // camera's frustum in both dimensions, for the current aspect ratio.
+  _fitDistance() {
+    const fitRadius = RADIUS + TILE_SIZE; // account for tiles poking past the sphere surface
+    const vFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const distanceForHeight = fitRadius / Math.sin(vFov / 2);
+    const distanceForWidth = fitRadius / Math.sin(hFov / 2);
+    return Math.max(distanceForHeight, distanceForWidth) * FIT_MARGIN;
   }
 
   _animate(time) {
     const dt = (time - this._lastTime) / 1000;
     this._lastTime = time;
 
-    if (this.autoRotate) {
-      this.scene.rotation.y += AUTO_ROTATE_SPEED * dt;
+    // Always spinning, even while dragging — a drag adds to this rather
+    // than pausing it, so the globe never actually stops turning.
+    this.scene.rotation.y += AUTO_ROTATE_SPEED * dt;
+
+    if (!this.dragging) {
       // Oscillating tilt on top of the spin so tiles near the poles drift
-      // into view too, not just the equatorial band.
+      // into view too, not just the equatorial band. Paused only while
+      // actively dragging, so a manual tilt isn't fought over.
       this.tiltPhase += AUTO_TILT_SPEED * dt;
       this.scene.rotation.x = Math.sin(this.tiltPhase) * MAX_TILT;
     }
@@ -216,9 +240,8 @@ export class AlbumGlobe {
   }
 
   dispose() {
-    clearTimeout(this.resumeTimer);
+    this._resizeObserver?.disconnect();
     this._clearTiles();
     this.renderer.dispose();
-    window.removeEventListener('resize', this._resize.bind(this));
   }
 }

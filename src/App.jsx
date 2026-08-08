@@ -33,7 +33,6 @@ export default function App() {
   const globeRef = useRef(null);
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
-
   const [mode, setMode] = useState(() => (getShareIdsFromUrl() ? 'preview' : 'own'));
   const [albums, setAlbums] = useState(() => (getShareIdsFromUrl() ? [] : loadStoredLibrary()));
   const [previewLoading, setPreviewLoading] = useState(mode === 'preview');
@@ -178,7 +177,6 @@ export default function App() {
           )}
         </div>
       </header>
-          // Viewer is seeing a shared globe and do their own when prompted 
       {isPreview && !previewLoading && !previewError && (
         <div className="preview-banner">
           <span>You're viewing a shared globe.</span>
