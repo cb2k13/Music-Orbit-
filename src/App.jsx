@@ -34,8 +34,6 @@ export default function App() {
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
 
-  // 'own' = editing your own persisted library. 'preview' = looking at
-  // someone else's shared globe, not yet saved anywhere.
   const [mode, setMode] = useState(() => (getShareIdsFromUrl() ? 'preview' : 'own'));
   const [albums, setAlbums] = useState(() => (getShareIdsFromUrl() ? [] : loadStoredLibrary()));
   const [previewLoading, setPreviewLoading] = useState(mode === 'preview');
@@ -67,7 +65,7 @@ export default function App() {
     })();
   }, [mode]);
 
-  // Initialize the globe once we have a canvas, keep it alive across renders.
+  // Initialize the globe once we have a blank canvas, keep it alive across renders.
   useEffect(() => {
     if (!canvasRef.current || globeRef.current) return;
     const globe = new AlbumGlobe(canvasRef.current);
@@ -77,7 +75,7 @@ export default function App() {
   }, []);
 
   // Push the current library to the globe whenever it changes. Only persist
-  // to localStorage while editing your own library — never overwrite it
+  // to localStorage while editing your own library and never overwrite it
   // with someone else's shared globe just because you're previewing it.
   useEffect(() => {
     globeRef.current?.loadAlbums(albums);
@@ -180,7 +178,7 @@ export default function App() {
           )}
         </div>
       </header>
-
+          // Viewer is seeing a shared globe and do their own when prompted 
       {isPreview && !previewLoading && !previewError && (
         <div className="preview-banner">
           <span>You're viewing a shared globe.</span>
@@ -232,7 +230,7 @@ export default function App() {
           )}
         </div>
       )}
-
+     
       {isPreview && previewLoading && (
         <div className="overlay-center">
           <div className="intro-card">
