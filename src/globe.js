@@ -2,13 +2,12 @@ import * as THREE from 'three';
 
 const RADIUS = 5;
 const TILE_SIZE = 0.62;
-const AUTO_ROTATE_SPEED = 0.035; // radians/sec, spin around Y — always on, never pauses
-const AUTO_TILT_SPEED = 0.09; // radians/sec, phase speed for the tilt oscillation
-const MAX_TILT = 0.55; // radians — how far the globe leans, so top/bottom tiles pass into view
-const FIT_MARGIN = 1.00; // extra breathing room around the sphere when framing it
+const AUTO_ROTATE_SPEED = 0.035; 
+const AUTO_TILT_SPEED = 0.09; 
+const MAX_TILT = 0.55; 
+const FIT_MARGIN = 1.00; 
 
-// Even distribution of N points on a sphere — avoids the pinching at the
-// poles you'd get from a naive latitude/longitude grid.
+
 function fibonacciSpherePoints(count, radius) {
   const points = [];
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
@@ -204,7 +203,7 @@ export class AlbumGlobe {
     // little breathing room on a tall phone screen.
     this.camera.position.z = this._fitDistance();
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(clientWidth, clientHeight, false);
+    this.renderer.setSize(clientWidth, clientHeight);
   }
 
   // Distance needed so a sphere of FIT_RADIUS stays fully inside the
